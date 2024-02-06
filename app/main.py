@@ -223,6 +223,26 @@ class Seq2SeqTransformer(nn.Module):
 vocab_transform = pickle.load(open('../vocab/vocab_transform.pkl', 'rb'))
 token_transform = pickle.load(open('../vocab/token_transform.pkl', 'rb'))
 
+def sequential_transforms(*transforms):
+    def func(txt_input):
+        for transform in transforms:
+            txt_input = transform(txt_input)
+        return txt_input
+    return func
+
+# function to add SOS/EOS and create tensor for input sequence indices
+def tensor_transform(token_ids):
+    return torch.cat((torch.tensor([2]), # SOS_IDX = 2
+                      torch.tensor(token_ids),
+                      torch.tensor([3]))) # EOS_IDX = 3
+
+# src and trg language text transforms to convert raw strings into tensors indices
+text_transform = {}
+for ln in ['en', 'th']:
+    text_transform[ln] = sequential_transforms(token_transform[ln], #Tokenization
+                                               vocab_transform[ln], #Numericalization
+                                               tensor_transform)
+
 input_dim   = len(vocab_transform['en'])
 output_dim  = len(vocab_transform['th'])
 hid_dim = 256
@@ -272,42 +292,56 @@ def predict():
 
         print('>>>>> calling a translator <<<<<')
 
-        src_mapping = vocab_transform['en'].get_itos()
-        trg_mapping = vocab_transform['th'].get_itos()
-
-        src_tokens = ['<sos>'] + token_transform['en'](input) + ['<eos>']
-        src_indexes = []
-        for token in src_tokens:
-            try:
-                src_indexes.append(src_mapping.index(token))
-            except:
-                src_indexes.append(src_mapping.index('<unk>'))
-        print(src_indexes)
-
-        src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)
-        src_mask = model.make_src_mask(src_tensor)
-
+        src_text = text_transform['en'](input).to(device)
+        src_text = src_text.reshape(1, -1)
+        trg_text = src_text
+        text_length = torch.tensor([src_text.size(0)]).to(dtype=torch.int64)
+        model.eval()
         with torch.no_grad():
-            enc_src = model.encoder(src_tensor, src_mask)  
-            trg_indexes = [trg_mapping.index('<sos>')] 
+            output, attentions = model(src_text, trg_text)
+        output = output.squeeze(0)[1:]
+        output = output.argmax(1)
+        translated = []
+        for token in output:
+            translated.append(vocab_transform['th'].get_itos()[token.items()])
+        translated = ''.join(translated)
+
+        # src_mapping = vocab_transform['en'].get_itos()
+        # trg_mapping = vocab_transform['th'].get_itos()
+
+        # src_tokens = ['<sos>'] + token_transform['en'](input) + ['<eos>']
+        # src_indexes = []
+        # for token in src_tokens:
+        #     try:
+        #         src_indexes.append(src_mapping.index(token))
+        #     except:
+        #         src_indexes.append(src_mapping.index('<unk>'))
+        # print(src_indexes)
+
+        # src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)
+        # src_mask = model.make_src_mask(src_tensor)
+
+        # with torch.no_grad():
+        #     enc_src = model.encoder(src_tensor, src_mask)  
+        #     trg_indexes = [trg_mapping.index('<sos>')] 
             
-            for i in range(100):  # Assume max length of the target sentence is 100
-                trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)
-                trg_mask = model.make_trg_mask(trg_tensor)
+        #     for i in range(100):  # Assume max length of the target sentence is 100
+        #         trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)
+        #         trg_mask = model.make_trg_mask(trg_tensor)
                 
-                output, attention = model.decoder(trg_tensor, enc_src, trg_mask, src_mask)
-                pred_token = output.argmax(2)[:, -1].item()
-                trg_indexes.append(pred_token)  # Add predicted token to trg_indexes
+        #         output, attention = model.decoder(trg_tensor, enc_src, trg_mask, src_mask)
+        #         pred_token = output.argmax(2)[:, -1].item()
+        #         trg_indexes.append(pred_token)  # Add predicted token to trg_indexes
                 
-                if pred_token == trg_mapping.index('<eos>'):
-                    break
+        #         if pred_token == trg_mapping.index('<eos>'):
+        #             break
 
-        trg_tokens = [trg_mapping[i] for i in trg_indexes]
+        # trg_tokens = [trg_mapping[i] for i in trg_indexes]
 
-        translated = ' '.join(trg_tokens[1:-1])
+        # translated = ' '.join(trg_tokens[1:-1])
 
-        return jsonify({'translated': translated,
-                        'attention': attention})
+        # return jsonify({'translated': translated,
+        #                 'attention': attention})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
