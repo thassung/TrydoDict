@@ -6,7 +6,7 @@ Welcome to the Machine Translation Demo App! This web-based application demonstr
 
 ## Dataset
 
-The machine translation is trained with a data from [Hugging Face]([https://gutenberg.org/](https://huggingface.co/datasets/scb_mt_enth_2020)) which is a large English-Thai parallel corpus, curated from news, Wikipedia articles, SMS messages, task-based dialogs, web-crawled data and government documents.
+The machine translation is trained with a data from [Hugging Face](https://huggingface.co/datasets/scb_mt_enth_2020) which is a large English-Thai parallel corpus, curated from news, Wikipedia articles, SMS messages, task-based dialogs, web-crawled data and government documents.
 
 ## Features
 
