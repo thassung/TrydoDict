@@ -61,12 +61,12 @@ There are 801,402 rows of English-Thai parallel text in the train dataset, 100,1
 
 The evaluation is from evaluations of ten epochs training on each model with different attention mechanisms. The loss and PPL (perplexity) of each model is picked from the epoch with the least validation loss and PPL which is also the evaluation of each model in [model](model). The epoch that yields the least validation loss for each model are
 
-| Attention | Training Loss | Validation Loss | From Epoch | Total Epoch | Avg. Training Time per Epoch | Memory Usage
-|----------|---------------|--------------|-----------------|----------------|
-| Scaled Dot-product Attention | 4.297 | 5.336 | 2 | 10 | 47.5 s | 4.89 GB
-| General Attention | 4.184 | 5.546 | 4 | 10 | 46.3 s | 4.89 GB
-| Multiplicative Attention | 3.949 | 5.443 | 5 | 10 | 47.2 s | 4.99 GB
-| Additive Attention | 5.361 | 3.821 | 5 | 6 | 2 s | 12.46 GB
+| Attention | Training Loss | Validation Loss | From Epoch | Total Epoch | Avg. Training Time per Epoch | Memory Usage |
+|----------|---------------|--------------|-----------------|----------------|----------------|----------------|
+| Scaled Dot-product Attention | 4.297 | 5.336 | 2 | 10 | 47.5 s | 4.89 GB |
+| General Attention | 4.184 | 5.546 | 4 | 10 | 46.3 s | 4.89 GB |
+| Multiplicative Attention | 3.949 | 5.443 | 5 | 10 | 47.2 s | 4.99 GB |
+| Additive Attention | 5.361 | 3.821 | 5 | 6 | 2 s | 12.46 GB |
 
 The number of trained epoch for the MT with additive attention is only 6 because of the available memory is not sufficient to handle additional linear layers for more than 6 epochs. In addition, the number of data rows used to train the MT with additive attention is much smaller—200 rows for training, 40 rows for validation, and 40 rows for training. The comparison between the MT and the three other MTs should be done with this fact in mind that it will not be entirely appropriate to do so.
 
