@@ -77,25 +77,32 @@ Considering only the three models that are trained with the same size of dataset
 
 ### Attention
 
+<style>
+td p {
+  text-align: center;
+  font-style: italic;
+}
+</style>
+
 <table>
   <tr>
     <td>
       <img src="./model/evaluation/attention_scaled-dot-product.png" alt="attention vs epoch with scaled dot-product attention" width="400">
-      <p>Description: Scaled dot-product attention mechanism visualized against epoch.</p>
+      <p>Scaled dot-product attention</p>
     </td>
     <td>
       <img src="./model/evaluation/attention_general.png" alt="attention vs epoch with general attention" width="400">
-      <p>Description: General attention mechanism visualized against epoch.</p>
+      <p>General attention</p>
     </td>
   </tr>
   <tr>
     <td>
       <img src="./model/evaluation/attention_additive.png" alt="attention vs epoch with additive attention" width="400">
-      <p>Description: Additive attention mechanism visualized against epoch.</p>
+      <p>Additive attention</p>
     </td>
     <td>
       <img src="./model/evaluation/attention_multiplicative.png" alt="attention vs epoch with multiplicative attention" width="400">
-      <p>Description: Multiplicative attention mechanism visualized against epoch.</p>
+      <p>Multiplicative attention</p>
     </td>
   </tr>
 </table>
