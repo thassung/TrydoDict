@@ -1,8 +1,6 @@
 from flask import Flask, render_template, request, send_file, send_from_directory, jsonify
-import torch, torchdata, torchtext
+import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import random, math, time
 import pickle
 
 app = Flask(__name__, template_folder='templates')
@@ -374,41 +372,32 @@ def predict():
 
         model.eval()
 
+        # tokenized input
         src_text = text_transform['en'](input).to(device)
         src_text = src_text.reshape(1, -1)
 
-        # mask future words' attention
-        src_mask = model.make_src_mask(src_text)
+        # tokenized <sos> for output initiation
+        trg_text = torch.tensor([vocab_transform['th']['<sos>']]).to(device).to(torch.int64)
+        trg_text = trg_text.reshape(1, -1)
 
-        # encode input
-        with torch.no_grad():
-            enc_src = model.encoder(src_text, src_mask)
-
-        trg_indexes = [vocab_transform['th']['<sos>']]
-
-        for i in range(int(src_text.shape[1]*1.5)):
-            # convert current to-be output to a tensor
-            trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)
-            
-            # create target mask
-            trg_mask = model.make_trg_mask(trg_tensor)
+        for i in range(int(src_text.shape[1]*1.5)):    
             
             # predict the next token for output
             with torch.no_grad():
-                output, attention = model.decoder(trg_tensor, enc_src, trg_mask, src_mask)
+                output, _ = model(src_text, trg_text)
             
             # output.shape = [_, _, vocab_size]
             pred_token = output.argmax(2)[:,-1].item()
             
-            # append generated token to trg_tensor for further generation
-            trg_indexes.append(pred_token)
+            # append generated token to trg_text for further generation
+            trg_text = torch.cat((trg_text, torch.tensor([[pred_token]], device=device, dtype=torch.int64)), dim=1)
             
             # stop if <eos> token is reached
             if pred_token == vocab_transform['th']['<eos>']:
                 break
 
         # convert the list of tokens to text
-        trg_tokens = [vocab_transform['th'].lookup_token(i) for i in trg_indexes]
+        trg_tokens = [vocab_transform['th'].lookup_token(i) for i in trg_text[0]]
 
         # remove start and end tokens for printed output
         translated = ''.join(trg_tokens[1:-1])
