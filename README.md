@@ -2,19 +2,19 @@
 
 ## Overview
 
-Welcome to the Machine Translation Demo App! This web-based application demonstrates the basic functionality of a machine translation, allowing users to input a word or sentence in English and retrieve the generated translation in Thai.
+   Welcome to the Machine Translation Demo App! This web-based application demonstrates the basic functionality of a machine translation, allowing users to input a word or sentence in English and retrieve the generated translation in Thai.
 
 ## Dataset
 
-The machine translation is trained with a data from [Hugging Face](https://huggingface.co/datasets/scb_mt_enth_2020) which is a large English-Thai parallel corpus, curated from news, Wikipedia articles, SMS messages, task-based dialogs, web-crawled data and government documents.
+   The machine translation is trained with a data from [Hugging Face](https://huggingface.co/datasets/scb_mt_enth_2020) which is a large English-Thai parallel corpus, curated from news, Wikipedia articles, SMS messages, task-based dialogs, web-crawled data and government documents.
 
-There are 801,402 rows of English-Thai parallel text in the train dataset, 100,173 rows in the validation dataset, and 100,177 rows in the test dataset. In this repository, the dataset is truncated to 10,000 rows of train dataset, 2,000 rows in validation dataset, and 2,000 rows in test dataset.
+   There are 801,402 rows of English-Thai parallel text in the train dataset, 100,173 rows in the validation dataset, and 100,177 rows in the test dataset. In this repository, the dataset is truncated to 10,000 rows of train dataset, 2,000 rows in validation dataset, and 2,000 rows in test dataset.
 
 ## Features
 
-- **Input:** User can enter an English word or sentence in the provided input section.
-- **Submit Button:** User clicks *submit* after typing the prompt. The app will generate the translation from the provided text.
-- **Generated Translation:** A translation will be generated and shown next to the submit button. The app might give &lt;unk&gt; in the generated text if the input contains unknown word or when the app sees that is appropriate.
+   - **Input:** User can enter an English word or sentence in the provided input section.
+   - **Submit Button:** User clicks *submit* after typing the prompt. The app will generate the translation from the provided text.
+   - **Generated Translation:** A translation will be generated and shown next to the submit button. The app might give &lt;unk&gt; in the generated text if the input contains unknown word or when the app sees that is appropriate.
 
 ## Application
 
@@ -59,7 +59,7 @@ There are 801,402 rows of English-Thai parallel text in the train dataset, 100,1
 | Multiplicative Attention | 3.949 | 51.903 | 5.443 | 231.157 |
 | Additive Attention | 5.361 | 212.896 | 3.821 | 45.644 | 
 
-The evaluation is from evaluations of ten epochs training on each model with different attention mechanisms. The loss and PPL (perplexity) of each model is picked from the epoch with the least validation loss and PPL which is also the evaluation of each model in [model](model). The epoch that yields the least validation loss for each model are
+   The evaluation is from evaluations of ten epochs training on each model with different attention mechanisms. The loss and PPL (perplexity) of each model is picked from the epoch with the least validation loss and PPL which is also the evaluation of each model in [model](model). The epoch that yields the least validation loss for each model are
 
 | Attention | Training Loss | Validation Loss | From Epoch | Total Epoch | Avg. Training Time per Epoch | Memory Usage |
 |----------|---------------|--------------|-----------------|----------------|----------------|----------------|
@@ -68,12 +68,12 @@ The evaluation is from evaluations of ten epochs training on each model with dif
 | Multiplicative Attention | 3.949 | 5.443 | 5 | 10 | 47.2 s | 4.99 GB |
 | Additive Attention | 5.361 | 3.821 | 5 | 6 | 2 s | 12.46 GB |
 
-The number of trained epoch for the MT with additive attention is only 6 because of the available memory is not sufficient to handle additional linear layers for more than 6 epochs. In addition, the number of data rows used to train the MT with additive attention is much smaller—200 rows for training, 40 rows for validation, and 40 rows for training. The comparison between the MT and the three other MTs should be done with this fact in mind that it will not be entirely appropriate to do so.
+   The number of trained epoch for the MT with additive attention is only 6 because of the available memory is not sufficient to handle additional linear layers for more than 6 epochs. In addition, the number of data rows used to train the MT with additive attention is much smaller—200 rows for training, 40 rows for validation, and 40 rows for training. The comparison between the MT and the three other MTs should be done with this fact in mind that it will not be entirely appropriate to do so.
 
 ![loss vs epoch](./model/evaluation/losses.png)
 ![val_loss vs epoch](./model/evaluation/val_losses.png)
 
-Considering only the three models that are trained with the same size of dataset, the model with scaled dot-product attention mechanism has reached the smallest validation loss (the best performance) at its second epoch followed by multiplicative attention and general attention respectively. The computational loads are very close to each other (see avg. training time per epoch and memory usage in the above table). To some extent, because their losses and computational loads are similar, it can be said that the three models have similar computational efficiency even though the two models with no additional layer, scaled dot-product and general attention, are expected to use lower computional power. Here, additive attention aside is unarguably the worst in computational efficiency due to the astronomical memory usage.
+   Considering only the three models that are trained with the same size of dataset, the model with scaled dot-product attention mechanism has reached the smallest validation loss (the best performance) at its second epoch followed by multiplicative attention and general attention respectively. The computational loads are very close to each other (see avg. training time per epoch and memory usage in the above table). To some extent, because their losses and computational loads are similar, it can be said that the three models have similar computational efficiency even though the two models with no additional layer, scaled dot-product and general attention, are expected to use lower computional power. Here, additive attention aside is unarguably the worst in computational efficiency due to the astronomical memory usage.
 
 ### Attention
 
@@ -106,6 +106,6 @@ ENG: *FAR LEFT: Indonesian National Police Chief Tito Karnavian, from left, Phil
 
 TH: *(ซ้ายสุด) นายติโต คาร์นาเวียน ผู้บัญชาการตํารวจแห่งชาติอินโดนีเซีย (จากซ้าย) นายโรนัลด์ เดลา โรซา ผู้บัญชาการตํารวจแห่งชาติฟิลิปปินส์ และนายคาลิด อาบู บาการ์ ผู้บัญชาการตํารวจแห่งชาติมาเลเซีย ไขว้แขนกันก่อนเริ่มการประชุมความมั่นคงไตรภาคีในเมืองปาเซย์ ซึ่งอยู่ทางตะวันออกเฉียงใต้ของกรุงมะนิลา ประเทศฟิลิปปินส์ ในเดือนมิถุนายน พ.ศ. 2560 ดิแอสโซซิเอทเต็ด เพรส*
 
-The attention heatmap can be interpreted by reading the query token (column-wise) and the key token (row-wise). The weight (color map gradient) probabilistically represents where attention is directed to when querying over a key. For example, for the MT with general attention, the word *Rosa* gives high attention to many output tokens especially *ภาพ* (means "picture" (noun.))implying these two words are closely correlated (for the model's perspective, at least).
+   The attention heatmap can be interpreted by reading the query token (column-wise) and the key token (row-wise). The weight (color map gradient) probabilistically represents where attention is directed to when querying over a key. For example, for the MT with general attention, the word *Rosa* gives high attention to many output tokens especially *ภาพ* (means "picture" (noun.))implying these two words are closely correlated (for the model's perspective, at least).
 
-From the attention matrices, the multiplicative shows the most promising attention since it successfully learns to give attention to *แห่งชาติ* (means "national" (adj.)) when *National* is the query token. This is the reason why the model with multiplicative attention is used in the application. However, there is only a few notable correct/expected attentions. This might be the problem of the chosen subset of training dataset which involves a highly specific context and contains a lot of proper nouns which proves to be a challenging task for a small model to generalize and understand.
+   From the attention matrices, the multiplicative shows the most promising attention since it successfully learns to give attention to *แห่งชาติ* (means "national" (adj.)) when *National* is the query token. This is the reason why the model with multiplicative attention is used in the application. However, there is only a few notable correct/expected attentions. This might be the problem of the chosen subset of training dataset which involves a highly specific context and contains a lot of proper nouns which proves to be a challenging task for a small model to generalize and understand.
