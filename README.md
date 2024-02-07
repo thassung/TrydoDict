@@ -70,19 +70,5 @@ The evaluation is from evaluations of ten epochs training on each model with dif
 
 The number of trained epoch for the MT with additive attention is only 6 because of the available memory is not sufficient to handle additional linear layers for more than 6 epochs. In addition, the number of data rows used to train the MT with additive attention is much smaller——200 rows for training, 40 rows for validation, and 40 rows for training. The comparison between the MT and the three other MTs should be done with this fact in mind that it will not be entirely appropriate to do so.
 
-<table>
-  <tr>
-    <td><img src="./model/evaluation/loss_additive.png" alt="loss vs epoch with additive attention" width="400"></td>
-    <td><img src="./model/evaluation/loss_general.png" alt="loss vs epoch with general attention" width="400"></td>
-  </tr>
-  <tr>
-    <td><img src="./model/evaluation/loss_scaled-dot-product.png" alt="loss vs epoch with scaled dot-product attention" width="400"></td>
-    <td><img src="./model/evaluation/loss_multiplicative.png" alt="loss vs epoch with multiplicative attention" width="400"></td>
-  </tr>
-</table>
-
-
-![loss vs epoch with additive attention](./model/evaluation/loss_additive.png)
-![loss vs epoch with general attention](./model/evaluation/loss_general.png)
-![loss vs epoch with scaled dot-product attention](./model/evaluation/loss_scaled-dot-product.png)
-![loss vs epoch with multiplicative attention](./model/evaluation/loss_multiplicative.png)
+![loss vs epoch](./model/evaluation/losses.png)
+![val_loss vs epoch](./model/evaluation/val_losses.png)
