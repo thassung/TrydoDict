@@ -305,8 +305,8 @@ def tensor_transform(token_ids):
                       torch.tensor(token_ids),
                       torch.tensor([3]))) # EOS_IDX = 3
     
-vocab_transform = pickle.load(open('./vocab/vocab_transform.pkl', 'rb'))
-token_transform = pickle.load(open('./vocab/token_transform.pkl', 'rb'))
+vocab_transform = pickle.load(open('../vocab/vocab_transform.pkl', 'rb'))
+token_transform = pickle.load(open('../vocab/token_transform.pkl', 'rb'))
 
 # src and trg language text transforms to convert raw strings into tensors indices
 text_transform = {}
@@ -355,7 +355,7 @@ dec = Decoder(output_dim,
               att_mech)
 
 model = Seq2SeqTransformer(enc, dec, SRC_PAD_IDX, TRG_PAD_IDX, device).to(device)
-model.load_state_dict(torch.load(f'./model/MT_enth_{att_mech}_best.pt',  map_location=device))
+model.load_state_dict(torch.load(f'../model/MT_enth_{att_mech}_best.pt',  map_location=device))
 
 @ app.route('/', methods=['POST', 'GET'])
 def main():
