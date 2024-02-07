@@ -72,5 +72,5 @@ The number of trained epoch for the MT with additive attention is only 6 because
 
 ![loss vs epoch with additive attention](./model/evaluation/loss_additive.png)
 ![loss vs epoch with general attention](./model/evaluation/loss_general.png)
-![loss vs epoch with scaled dot-product attention](./model/evaluation/loss_scaled dot-product.png)
+![loss vs epoch with scaled dot-product attention]("./model/evaluation/loss_scaled dot-product.png")
 ![loss vs epoch with multiplicative attention](./model/evaluation/loss_multiplicative.png)
