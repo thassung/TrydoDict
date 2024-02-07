@@ -77,13 +77,6 @@ Considering only the three models that are trained with the same size of dataset
 
 ### Attention
 
-<style>
-td p {
-  text-align: center;
-  font-style: italic;
-}
-</style>
-
 <table>
   <tr>
     <td>
