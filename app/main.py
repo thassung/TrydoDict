@@ -9,58 +9,31 @@ app = Flask(__name__, template_folder='templates')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class EncoderLayer(nn.Module):
-    def __init__(self, hid_dim, n_heads, pf_dim, dropout, device):
-        super().__init__()
-        self.self_attn_layer_norm = nn.LayerNorm(hid_dim)
-        self.ff_layer_norm        = nn.LayerNorm(hid_dim)
-        self.self_attention       = MultiHeadAttentionLayer(hid_dim, n_heads, dropout, device)
-        self.feedforward          = PositionwiseFeedforwardLayer(hid_dim, pf_dim, dropout)
-        self.dropout              = nn.Dropout(dropout)
-
-    def forward(self, src, src_mask):
-        src     = self.self_attn_layer_norm(src + self.dropout(_src))
-        _src    = self.feedforward(src)
-        src     = self.ff_layer_norm(src + self.dropout(_src))
-        return src
-
-class Encoder(nn.Module):
-    def __init__(self, input_dim, hid_dim, n_layers, n_heads, pf_dim, dropout, device, max_length = 512):
-        super().__init__()
-        self.device = device
-        self.tok_embedding = nn.Embedding(input_dim, hid_dim)
-        self.pos_embedding = nn.Embedding(max_length, hid_dim)
-        self.layers        = nn.ModuleList([EncoderLayer(hid_dim, n_heads, pf_dim, dropout, device)
-                                           for _ in range(n_layers)])
-        self.dropout       = nn.Dropout(dropout)
-        self.scale         = torch.sqrt(torch.FloatTensor([hid_dim])).to(self.device)
-
-    def forward(self, src, src_mask):
-        batch_size = src.shape[0]
-        src_len    = src.shape[1]
-        pos        = torch.arange(0, src_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
-        src        = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
-        for layer in self.layers:
-            src = layer(src, src_mask)
-        return src
-
 class MultiHeadAttentionLayer(nn.Module):
-    def __init__(self, hid_dim, n_heads, dropout, device):
+    def __init__(self, hid_dim, n_heads, dropout, device, att_mech):
         super().__init__()
         assert hid_dim % n_heads == 0
         self.hid_dim  = hid_dim
         self.n_heads  = n_heads
         self.head_dim = hid_dim // n_heads
-
         self.fc_q     = nn.Linear(hid_dim, hid_dim)
         self.fc_k     = nn.Linear(hid_dim, hid_dim)
         self.fc_v     = nn.Linear(hid_dim, hid_dim)
-
         self.fc_o     = nn.Linear(hid_dim, hid_dim)
-
         self.dropout  = nn.Dropout(dropout)
 
-        self.scale    = torch.sqrt(torch.FloatTensor([self.head_dim])).to(device)
+        self.mech = att_mech # scaled dot-product, general, multiplicative, additive
+
+        if self.mech == 'scaled dot-product':
+            self.scale  = torch.sqrt(torch.FloatTensor([self.head_dim])).to(device)
+        elif self.mech == 'general':
+            pass
+        elif self.mech == 'multiplicative':
+            self.W      = nn.Linear(self.head_dim, self.head_dim)
+        elif self.mech == 'additive':
+            self.W1     = nn.Linear(self.head_dim, self.head_dim)
+            self.W2     = nn.Linear(self.head_dim, self.head_dim)
+            self.V      = nn.Linear(self.head_dim, 1)
 
     def forward(self, query, key, value, mask = None):
         #src, src, src, src_mask
@@ -70,8 +43,8 @@ class MultiHeadAttentionLayer(nn.Module):
 
         batch_size = query.shape[0]
 
-        Q = self.fc_q(query)
-        K = self.fc_k(key)
+        Q = self.fc_q(query) # s
+        K = self.fc_k(key) # h
         V = self.fc_v(value)
         #Q=K=V: [batch_size, src len, hid_dim]
 
@@ -80,7 +53,18 @@ class MultiHeadAttentionLayer(nn.Module):
         V = V.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
         #Q = [batch_size, n heads, query len, head_dim]
 
-        energy = torch.matmul(Q, K.permute(0, 1, 3, 2)) / self.scale
+        ## add energy types
+        if self.mech == 'scaled dot-product':
+            energy = torch.matmul(Q, K.permute(0, 1, 3, 2)) / self.scale
+        elif self.mech == 'general':
+            energy = torch.matmul(Q, K.permute(0, 1, 3, 2))
+        elif self.mech == 'multiplicative':
+            energy = torch.matmul(self.W(Q), K.permute(0, 1, 3, 2))
+        elif self.mech == 'additive':
+            energy = self.V(torch.tanh(self.W1(Q.unsqueeze(3)) + self.W2(K.unsqueeze(2)))).squeeze(-1)
+        else:
+            raise ValueError(f"{self.mech} is not a valid attention mech: scaled dot-product, general, multiplicative, additive")
+
         #Q = [batch_size, n heads, query len, head_dim] @ K = [batch_size, n heads, head_dim, key len]
         #energy = [batch_size, n heads, query len, key len]
 
@@ -106,6 +90,60 @@ class MultiHeadAttentionLayer(nn.Module):
 
         return x, attention
 
+
+class EncoderLayer(nn.Module):
+    def __init__(self, hid_dim, n_heads, pf_dim, dropout, device, att_mech):
+        super().__init__()
+        self.self_attn_layer_norm = nn.LayerNorm(hid_dim)
+        self.ff_layer_norm        = nn.LayerNorm(hid_dim)
+        self.self_attention       = MultiHeadAttentionLayer(hid_dim, n_heads, dropout, device, att_mech)
+        self.feedforward          = PositionwiseFeedforwardLayer(hid_dim, pf_dim, dropout)
+        self.dropout              = nn.Dropout(dropout)
+
+    def forward(self, src, src_mask):
+        #src = [batch size, src len, hid dim]
+        #src_mask = [batch size, 1, 1, src len]   #if the token is padding, it will be 1, otherwise 0
+        _src, _ = self.self_attention(src, src, src, src_mask)
+        src     = self.self_attn_layer_norm(src + self.dropout(_src))
+        #src: [batch_size, src len, hid dim]
+
+        _src    = self.feedforward(src)
+        src     = self.ff_layer_norm(src + self.dropout(_src))
+        #src: [batch_size, src len, hid dim]
+
+        return src
+
+class Encoder(nn.Module):
+    def __init__(self, input_dim, hid_dim, n_layers, n_heads, pf_dim, dropout, device, att_mech, max_length = 512):
+        super().__init__()
+        self.device = device
+        self.tok_embedding = nn.Embedding(input_dim, hid_dim)
+        self.pos_embedding = nn.Embedding(max_length, hid_dim)
+        self.layers        = nn.ModuleList([EncoderLayer(hid_dim, n_heads, pf_dim, dropout, device, att_mech)
+                                           for _ in range(n_layers)])
+        self.dropout       = nn.Dropout(dropout)
+        self.scale         = torch.sqrt(torch.FloatTensor([hid_dim])).to(self.device)
+
+    def forward(self, src, src_mask):
+
+        #src = [batch size, src len]
+        #src_mask = [batch size, 1, 1, src len]
+
+        batch_size = src.shape[0]
+        src_len    = src.shape[1]
+
+        pos        = torch.arange(0, src_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
+        #pos: [batch_size, src_len]
+
+        src        = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
+        #src: [batch_size, src_len, hid_dim]
+
+        for layer in self.layers:
+            src = layer(src, src_mask)
+        #src: [batch_size, src_len, hid_dim]
+
+        return src
+
 class PositionwiseFeedforwardLayer(nn.Module):
     def __init__(self, hid_dim, pf_dim, dropout):
         super().__init__()
@@ -121,13 +159,13 @@ class PositionwiseFeedforwardLayer(nn.Module):
         return x
 
 class DecoderLayer(nn.Module):
-    def __init__(self, hid_dim, n_heads, pf_dim, dropout, device):
+    def __init__(self, hid_dim, n_heads, pf_dim, dropout, device, att_mech):
         super().__init__()
         self.self_attn_layer_norm = nn.LayerNorm(hid_dim)
         self.enc_attn_layer_norm  = nn.LayerNorm(hid_dim)
         self.ff_layer_norm        = nn.LayerNorm(hid_dim)
-        self.self_attention       = MultiHeadAttentionLayer(hid_dim, n_heads, dropout, device)
-        self.encoder_attention    = MultiHeadAttentionLayer(hid_dim, n_heads, dropout, device)
+        self.self_attention       = MultiHeadAttentionLayer(hid_dim, n_heads, dropout, device, att_mech)
+        self.encoder_attention    = MultiHeadAttentionLayer(hid_dim, n_heads, dropout, device, att_mech)
         self.feedforward          = PositionwiseFeedforwardLayer(hid_dim, pf_dim, dropout)
         self.dropout              = nn.Dropout(dropout)
 
@@ -152,15 +190,15 @@ class DecoderLayer(nn.Module):
         #trg = [batch_size, trg len, hid dim]
 
         return trg, attention
-
+    
 class Decoder(nn.Module):
     def __init__(self, output_dim, hid_dim, n_layers, n_heads,
-                 pf_dim, dropout, device,max_length = 512):
+                 pf_dim, dropout, device, att_mech, max_length = 512):
         super().__init__()
         self.device = device
         self.tok_embedding = nn.Embedding(output_dim, hid_dim)
         self.pos_embedding = nn.Embedding(max_length, hid_dim)
-        self.layers        = nn.ModuleList([DecoderLayer(hid_dim, n_heads, pf_dim, dropout, device)
+        self.layers        = nn.ModuleList([DecoderLayer(hid_dim, n_heads, pf_dim, dropout, device, att_mech)
                                             for _ in range(n_layers)])
         self.fc_out        = nn.Linear(hid_dim, output_dim)
         self.dropout       = nn.Dropout(dropout)
@@ -203,25 +241,56 @@ class Seq2SeqTransformer(nn.Module):
         self.device = device
 
     def make_src_mask(self, src):
+
+        #src = [batch size, src len]
+
         src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
+        #src_mask = [batch size, 1, 1, src len]
+
         return src_mask
 
     def make_trg_mask(self, trg):
+
+        #trg = [batch size, trg len]
+
         trg_pad_mask = (trg != self.trg_pad_idx).unsqueeze(1).unsqueeze(2)
+        #trg_pad_mask = [batch size, 1, 1, trg len]
+
         trg_len = trg.shape[1]
+
         trg_sub_mask = torch.tril(torch.ones((trg_len, trg_len), device = self.device)).bool()
+        #trg_sub_mask = [trg len, trg len]
+
         trg_mask = trg_pad_mask & trg_sub_mask
+        #trg_mask = [batch size, 1, trg len, trg len]
+
         return trg_mask
 
     def forward(self, src, trg):
+
+        #src = [batch size, src len]
+        #trg = [batch size, trg len]
+
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
+
+        #src_mask = [batch size, 1, 1, src len]
+        #trg_mask = [batch size, 1, trg len, trg len]
+
         enc_src = self.encoder(src, src_mask)
+        #enc_src = [batch size, src len, hid dim]
+
         output, attention = self.decoder(trg, enc_src, trg_mask, src_mask)
+
+        #output = [batch size, trg len, output dim]
+        #attention = [batch size, n heads, trg len, src len]
+
         return output, attention
-    
-vocab_transform = pickle.load(open('../vocab/vocab_transform.pkl', 'rb'))
-token_transform = pickle.load(open('../vocab/token_transform.pkl', 'rb'))
+
+
+def initialize_weights(m):
+    if hasattr(m, 'weight') and m.weight.dim() > 1:
+        nn.init.xavier_uniform_(m.weight.data)
 
 def sequential_transforms(*transforms):
     def func(txt_input):
@@ -235,6 +304,9 @@ def tensor_transform(token_ids):
     return torch.cat((torch.tensor([2]), # SOS_IDX = 2
                       torch.tensor(token_ids),
                       torch.tensor([3]))) # EOS_IDX = 3
+    
+vocab_transform = pickle.load(open('./vocab/vocab_transform.pkl', 'rb'))
+token_transform = pickle.load(open('./vocab/token_transform.pkl', 'rb'))
 
 # src and trg language text transforms to convert raw strings into tensors indices
 text_transform = {}
@@ -258,13 +330,20 @@ dec_dropout = 0.1
 SRC_PAD_IDX = 1
 TRG_PAD_IDX = 1
 
+# The model is fixed so that the app can preimport model without user input
+# You can change the below line to change the model into Seq2Seq model with different attentions
+# Avaiable attention mechanisms are 'general', 'scaled dot-product', 'multiplicative', and 'additive'
+# Note that 'additive' attention model is trained on a much smaller data because of GPU memory limitation (see more in README).
+att_mech = 'multiplicative' 
+
 enc = Encoder(input_dim,
               hid_dim,
               enc_layers,
               enc_heads,
               enc_pf_dim,
               enc_dropout,
-              device)
+              device,
+              att_mech)
 
 dec = Decoder(output_dim,
               hid_dim,
@@ -272,10 +351,11 @@ dec = Decoder(output_dim,
               dec_heads,
               dec_pf_dim,
               enc_dropout,
-              device)
+              device,
+              att_mech)
 
 model = Seq2SeqTransformer(enc, dec, SRC_PAD_IDX, TRG_PAD_IDX, device).to(device)
-model.load_state_dict(torch.load('../model/MT_enth.pt',  map_location=device))
+model.load_state_dict(torch.load(f'./model/MT_enth_{att_mech}_best.pt',  map_location=device))
 
 @ app.route('/', methods=['POST', 'GET'])
 def main():
@@ -292,56 +372,50 @@ def predict():
 
         print('>>>>> calling a translator <<<<<')
 
+        model.eval()
+
         src_text = text_transform['en'](input).to(device)
         src_text = src_text.reshape(1, -1)
-        trg_text = src_text
-        text_length = torch.tensor([src_text.size(0)]).to(dtype=torch.int64)
-        model.eval()
+
+        # mask future words' attention
+        src_mask = model.make_src_mask(src_text)
+
+        # encode input
         with torch.no_grad():
-            output, attentions = model(src_text, trg_text)
-        output = output.squeeze(0)[1:]
-        output = output.argmax(1)
-        translated = []
-        for token in output:
-            translated.append(vocab_transform['th'].get_itos()[token.items()])
-        translated = ''.join(translated)
+            enc_src = model.encoder(src_text, src_mask)
 
-        # src_mapping = vocab_transform['en'].get_itos()
-        # trg_mapping = vocab_transform['th'].get_itos()
+        trg_indexes = [vocab_transform['th']['<sos>']]
 
-        # src_tokens = ['<sos>'] + token_transform['en'](input) + ['<eos>']
-        # src_indexes = []
-        # for token in src_tokens:
-        #     try:
-        #         src_indexes.append(src_mapping.index(token))
-        #     except:
-        #         src_indexes.append(src_mapping.index('<unk>'))
-        # print(src_indexes)
-
-        # src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)
-        # src_mask = model.make_src_mask(src_tensor)
-
-        # with torch.no_grad():
-        #     enc_src = model.encoder(src_tensor, src_mask)  
-        #     trg_indexes = [trg_mapping.index('<sos>')] 
+        for i in range(int(src_text.shape[1]*1.5)):
+            # convert current to-be output to a tensor
+            trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)
             
-        #     for i in range(100):  # Assume max length of the target sentence is 100
-        #         trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)
-        #         trg_mask = model.make_trg_mask(trg_tensor)
-                
-        #         output, attention = model.decoder(trg_tensor, enc_src, trg_mask, src_mask)
-        #         pred_token = output.argmax(2)[:, -1].item()
-        #         trg_indexes.append(pred_token)  # Add predicted token to trg_indexes
-                
-        #         if pred_token == trg_mapping.index('<eos>'):
-        #             break
+            # create target mask
+            trg_mask = model.make_trg_mask(trg_tensor)
+            
+            # predict the next token for output
+            with torch.no_grad():
+                output, attention = model.decoder(trg_tensor, enc_src, trg_mask, src_mask)
+            
+            # output.shape = [_, _, vocab_size]
+            pred_token = output.argmax(2)[:,-1].item()
+            
+            # append generated token to trg_tensor for further generation
+            trg_indexes.append(pred_token)
+            
+            # stop if <eos> token is reached
+            if pred_token == vocab_transform['th']['<eos>']:
+                break
 
-        # trg_tokens = [trg_mapping[i] for i in trg_indexes]
+        # convert the list of tokens to text
+        trg_tokens = [vocab_transform['th'].lookup_token(i) for i in trg_indexes]
 
-        # translated = ' '.join(trg_tokens[1:-1])
+        # remove start and end tokens for printed output
+        translated = ''.join(trg_tokens[1:-1])
 
-        # return jsonify({'translated': translated,
-        #                 'attention': attention})
+        print(translated)
+
+        return jsonify({'translated': translated})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
