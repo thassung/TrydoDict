@@ -46,7 +46,10 @@
    python main.py
    ```
 
-   You can access the application via http://localhost:8080
+   You can access the application via http://localhost:8080. Below is what the starting interface looked like.
+   
+   ![image](https://github.com/thassung/TrydoDict/assets/105700459/9745ad8c-a675-4f40-a675-bd11dae4c45c)
+
 
 ## Evaluation
 
